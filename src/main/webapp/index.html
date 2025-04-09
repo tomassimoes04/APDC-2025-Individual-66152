@@ -1,29 +1,51 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
-  <head>
-    <meta http-equiv="content-type" content="application/xhtml+xml; charset=UTF-8" />
-    <title>ADC: My First Web App</title>
-  </head>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ADC 2024/25 - API Individual - Tomás Simões (66152)</title>
+  <style>
+    body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+    h1, h2 { color: #333; }
+    code { background-color: #f4f4f4; padding: 2px 5px; border-radius: 3px; }
+    li { margin-bottom: 10px; }
+    span.method { font-weight: bold; display: inline-block; width: 60px; }
+    span.post { color: #4CAF50; } /* Green */
+    span.get { color: #2196F3; } /* Blue */
+    span.delete { color: #f44336; } /* Red */
+    span.put { color: #ff9800; } /* Orange */
+  </style>
+</head>
+<body>
 
-  <body>
-    <h1>Welcome to this very simple web application!</h1>
+<h1>ADC 2024/25 - API REST Individual</h1>
+<p>Implementação do Exercício Individual.</p>
+<p><strong>Aluno:</strong> Tomás Simões | <strong>Número:</strong> 66152</p>
 
-    <table>
-      <tr>
-        <td colspan="2" style="font-weight:bold;">Available Services:</td>        
-      </tr>
-      <tr>
-        <td><a href='https://www.di.fct.unl.pt'>DI-FCT-UNL</a></td><td>(greetings)</td>
-      </tr>
-      <tr>
-        <td><a href='/rest/utils/hello'>Say Hello!</a></td><td>(greetings)</td>
-      </tr>
-      <tr>
-        <td><a href='/rest/utils/time'>What time is it?</a></td><td>(see server time)</td>
-      </tr>
-    </table>
-  </body>
-  <footer>
-  	Copyright: ADC-PEI, FCT NOVA 2025
-  </footer>
+<h2>Endpoints da API</h2>
+<p>A base da API é <code>/rest</code>. Todas as operações (exceto Registo/Login) requerem um token de autenticação no header <code>Authorization: Bearer {tokenID}</code>.</p>
+
+<ul>
+  <li><span class="method post">POST</span> <code>/rest/register/</code> : Registo de novo utilizador (OP1).</li>
+  <li><span class="method post">POST</span> <code>/rest/login/</code> : Login de utilizador (retorna AuthToken) (OP2).</li>
+  <li><span class="method post">POST</span> <code>/rest/login/logout</code> : Logout (invalida token) (OP9).</li>
+  <li><span class="method post">POST</span> <code>/rest/user/changestate</code> : Alterar estado da conta (ADMIN/BACKOFFICE) (OP4).</li>
+  <li><span class="method post">POST</span> <code>/rest/user/changerole</code> : Alterar role da conta (ADMIN/BACKOFFICE) (OP3).</li>
+  <li><span class="method post">POST</span> <code>/rest/user/changepwd</code> : Alterar a própria password (Utilizador autenticado) (OP8).</li>
+  <li><span class="method post">POST</span> <code>/rest/user/updateatts</code> : Atualizar atributos do perfil (Permissões variáveis) (OP7).</li>
+  <li><span class="method post">POST</span> <code>/rest/user/listusers</code> : Listar utilizadores (Visibilidade por role) (OP6).</li>
+  <li><span class="method delete">DELETE</span> <code>/rest/user/{username}</code> : Remover conta de utilizador (ADMIN/BACKOFFICE) (OP5).</li>
+  <li><span class="method post">POST</span> <code>/rest/worksheet/</code> : Criar/Atualizar folha de obra (BACKOFFICE/ADMIN) (OP10).</li>
+  <li><span class="method post">POST</span> <code>/rest/worksheet/updatestate</code> : Atualizar estado de execução da obra (PARTNER associado) (OP10).</li>
+  <!-- Adicionar outros endpoints opcionais se implementados -->
+</ul>
+
+<p><em>Consulte o README.md no repositório GitHub para mais detalhes sobre compilação e deploy.</em></p>
+
+<hr>
+<footer>
+  ADC-FCT NOVA 2024/2025
+</footer>
+
+</body>
 </html>
