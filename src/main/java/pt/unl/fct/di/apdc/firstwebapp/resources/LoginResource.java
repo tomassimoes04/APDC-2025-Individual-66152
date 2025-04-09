@@ -1,41 +1,23 @@
 package pt.unl.fct.di.apdc.firstwebapp.resources;
 
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import jakarta.ws.rs.*;
 import org.apache.commons.codec.digest.DigestUtils;
 
 import com.google.cloud.Timestamp;
 import com.google.cloud.datastore.Datastore;
+import com.google.cloud.datastore.DatastoreException;
 import com.google.cloud.datastore.DatastoreOptions;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.Key;
 import com.google.cloud.datastore.KeyFactory;
-import com.google.cloud.datastore.PathElement;
-import com.google.cloud.datastore.Query;
-import com.google.cloud.datastore.QueryResults;
-import com.google.cloud.datastore.StringValue;
-import com.google.cloud.datastore.StructuredQuery.CompositeFilter;
-import com.google.cloud.datastore.StructuredQuery.OrderBy;
-import com.google.cloud.datastore.StructuredQuery.PropertyFilter;
-import com.google.cloud.datastore.Transaction;
+
 import com.google.gson.Gson;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.ws.rs.Consumes;
-import jakarta.ws.rs.GET;
-import jakarta.ws.rs.POST;
-import jakarta.ws.rs.Path;
-import jakarta.ws.rs.PathParam;
-import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.QueryParam;
-import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response.Status;
 import pt.unl.fct.di.apdc.firstwebapp.util.AuthToken;
 import pt.unl.fct.di.apdc.firstwebapp.util.LoginData;
@@ -44,345 +26,179 @@ import pt.unl.fct.di.apdc.firstwebapp.util.LoginData;
 @Produces(MediaType.APPLICATION_JSON + ";charset=utf-8")
 public class LoginResource {
 
+	// Mensagem genérica para falhas de login (segurança)
 	private static final String MESSAGE_INVALID_CREDENTIALS = "Incorrect username or password.";
-	private static final String MESSAGE_NEXT_PARAMETER_INVALID = "Request parameter 'next' must be greater or equal to 0.";
 
-	private static final String LOG_MESSAGE_LOGIN_ATTEMP = "Login attempt by user: ";
-	private static final String LOG_MESSAGE_LOGIN_SUCCESSFUL = "Login successful by user: ";
-	private static final String LOG_MESSAGE_WRONG_PASSWORD = "Wrong password for: ";
-	private static final String LOG_MESSAGE_UNKNOW_USER = "Failed login attempt for username: ";
+	// Constantes para Logging
+	private static final String LOG_MESSAGE_LOGIN_ATTEMPT = "Login attempt by user: ";
+	private static final String LOG_MESSAGE_LOGIN_SUCCESSFUL = "Login successful for user: ";
+	private static final String LOG_MESSAGE_WRONG_PASSWORD = "Wrong password provided for user: ";
+	private static final String LOG_MESSAGE_USER_NOT_FOUND = "Login failed: User not found: ";
+	private static final String LOG_MESSAGE_INACTIVE_ACCOUNT = "Login failed: Account inactive or invalid state for user: ";
 
-	private static final String USER_PWD = "user_pwd";
-	private static final String USER_LOGIN_TIME = "user_login_time";
+	// Constante para o nome do campo da password no Datastore
+	private static final String USER_PWD_PROPERTY = "user_pwd";
+	// Constantes para os novos campos a verificar/ler
+	private static final String USER_STATE_PROPERTY = "user_state";
+	private static final String USER_ROLE_PROPERTY = "user_role";
+	private static final String USER_LOGIN_TIME_PROPERTY = "user_login_time";
 
 	private static final Logger LOG = Logger.getLogger(LoginResource.class.getName());
 	private static final Datastore datastore = DatastoreOptions.getDefaultInstance().getService();
 	private static final KeyFactory userKeyFactory = datastore.newKeyFactory().setKind("User");
+	// --- ADICIONADO KeyFactory para Tokens ---
+	private static final KeyFactory tokenKeyFactory = datastore.newKeyFactory().setKind("AuthToken");
 
-	private final Gson g = new Gson();
+	private final Gson g = new Gson(); // Gson é necessário para serializar o AuthToken
 
 	public LoginResource() {
-
+		// Construtor vazio
 	}
 
 	@POST
 	@Path("/")
 	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)
 	public Response doLogin(LoginData data) {
-		LOG.fine(LOG_MESSAGE_LOGIN_ATTEMP + data.username);
-
-		if (data.username.equals("user") && data.password.equals("password")) {
-			AuthToken at = new AuthToken(data.username);
-			return Response.ok(g.toJson(at)).build();
+		// Validação básica do input
+		if (data == null || data.username == null || data.password == null || data.username.isBlank() || data.password.isBlank()) {
+			LOG.warning("Login failed: Missing username or password in request body.");
+			return Response.status(Status.BAD_REQUEST).entity("Missing username or password.").build();
 		}
-		return Response.status(Status.FORBIDDEN)
-				.entity(MESSAGE_INVALID_CREDENTIALS)
-				.build();
-	}
 
-	@GET
-	@Path("/{username}")
-	public Response checkUsernameAvailable(@PathParam("username") String username) {
-		if (username.trim().equals("user")) {
-			return Response.ok().entity(g.toJson(true)).build();
-		} else {
-			return Response.ok().entity(g.toJson(false)).build();
-		}
-	}
-
-	@POST
-	@Path("/v1")
-	@Consumes(MediaType.APPLICATION_JSON)
-	@Produces(MediaType.APPLICATION_JSON)
-	public Response doLoginV1(LoginData data) {
-		LOG.fine(LOG_MESSAGE_LOGIN_ATTEMP + data.username);
-
+		LOG.info(LOG_MESSAGE_LOGIN_ATTEMPT + data.username);
 		Key userKey = userKeyFactory.newKey(data.username);
 
-		Entity user = datastore.get(userKey);
-		if (user != null) {
-			String hashedPWD = (String) user.getString(USER_PWD);
-			if (hashedPWD.equals(DigestUtils.sha512Hex(data.password))) {
-				LOG.info(LOG_MESSAGE_LOGIN_SUCCESSFUL + data.username);
-				AuthToken token = new AuthToken(data.username);
-				return Response.ok(g.toJson(token)).build();
-			} else {
-				LOG.warning(LOG_MESSAGE_WRONG_PASSWORD + data.username);
-				return Response.status(Status.FORBIDDEN)
-						.entity(MESSAGE_INVALID_CREDENTIALS)
-						.build();
-			}
-		} else {
-			LOG.warning(LOG_MESSAGE_UNKNOW_USER + data.username);
-			return Response.status(Status.FORBIDDEN)
-					.entity(MESSAGE_INVALID_CREDENTIALS)
-					.build();
-		}
-	}
-
-	@POST
-	@Path("/v1a")
-	@Consumes(MediaType.APPLICATION_JSON)
-	@Produces(MediaType.APPLICATION_JSON)
-	public Response doLoginV1a(LoginData data) {
-		LOG.fine(LOG_MESSAGE_LOGIN_ATTEMP + data.username);
-
-		Key userKey = userKeyFactory.newKey(data.username);
-
-		Entity user = datastore.get(userKey);
-		if (user != null) {
-			String hashedPWD = (String) user.getString(USER_PWD);
-			if (hashedPWD.equals(DigestUtils.sha512Hex(data.password))) {
-				user = Entity.newBuilder(user)
-						.set("user_login_time", Timestamp.now())
-						.build();
-				datastore.update(user);
-				LOG.info(LOG_MESSAGE_LOGIN_SUCCESSFUL + data.username);
-				AuthToken token = new AuthToken(data.username);
-				return Response.ok(g.toJson(token)).build();
-			} else {
-				LOG.warning(LOG_MESSAGE_WRONG_PASSWORD + data.username);
-				return Response.status(Status.FORBIDDEN)
-						.entity(MESSAGE_INVALID_CREDENTIALS)
-						.build();
-			}
-		} else {
-			LOG.warning(LOG_MESSAGE_UNKNOW_USER + data.username);
-			return Response.status(Status.FORBIDDEN)
-					.entity(MESSAGE_INVALID_CREDENTIALS)
-					.build();
-		}
-	}
-
-	@POST
-	@Path("/v1b")
-	@Consumes(MediaType.APPLICATION_JSON)
-	@Produces(MediaType.APPLICATION_JSON)
-	public Response doLoginV1b(LoginData data) {
-		LOG.fine(LOG_MESSAGE_LOGIN_ATTEMP + data.username);
-
-		Key userKey = userKeyFactory.newKey(data.username);
-
-		Entity user = datastore.get(userKey);
-		if (user != null) {
-			String hashedPWD = user.getString(USER_PWD);
-			if (hashedPWD.equals(DigestUtils.sha512Hex(data.password))) {
-				KeyFactory logKeyFactory = datastore.newKeyFactory()
-						.addAncestor(PathElement.of("User", data.username))
-						.setKind("UserLog");
-				Key logKey = datastore.allocateId(logKeyFactory.newKey());
-				Entity userLog = Entity.newBuilder(logKey)
-						.set("user_login_time", Timestamp.now())
-						.build();
-				datastore.put(userLog);
-				LOG.info(LOG_MESSAGE_LOGIN_SUCCESSFUL + data.username);
-				AuthToken token = new AuthToken(data.username);
-				return Response.ok(g.toJson(token)).build();
-			} else {
-				LOG.warning(LOG_MESSAGE_WRONG_PASSWORD + data.username);
-				return Response.status(Status.FORBIDDEN)
-						.entity(MESSAGE_INVALID_CREDENTIALS)
-						.build();
-			}
-		} else {
-			LOG.warning(LOG_MESSAGE_UNKNOW_USER + data.username);
-			return Response.status(Status.FORBIDDEN)
-					.entity(MESSAGE_INVALID_CREDENTIALS)
-					.build();
-		}
-	}
-
-	@POST
-	@Path("/v2")
-	@Consumes(MediaType.APPLICATION_JSON)
-	@Produces(MediaType.APPLICATION_JSON)
-	public Response doLoginV2(LoginData data,
-			@Context HttpServletRequest request,
-			@Context HttpHeaders headers) {
-		LOG.fine(LOG_MESSAGE_LOGIN_ATTEMP + data.username);
-
-		Key userKey = userKeyFactory.newKey(data.username);
-		Key ctrsKey = datastore.newKeyFactory()
-				.addAncestors(PathElement.of("User", data.username))
-				.setKind("UserStats")
-				.newKey("counters");
-		// Generate automatically a key
-		Key logKey = datastore.allocateId(
-				datastore.newKeyFactory()
-						.addAncestors(PathElement.of("User", data.username))
-						.setKind("UserLog").newKey());
-
-		Transaction txn = datastore.newTransaction();
 		try {
-			Entity user = txn.get(userKey);
-			if (user == null) {
-				// Username does not exist
-				LOG.warning(LOG_MESSAGE_LOGIN_ATTEMP + data.username);
-				return Response.status(Status.FORBIDDEN)
-						.entity(MESSAGE_INVALID_CREDENTIALS)
-						.build();
-			}
+			Entity user = datastore.get(userKey);
 
-			// We get the user stats from the storage
-			Entity stats = txn.get(ctrsKey);
-			if (stats == null) {
-				stats = Entity.newBuilder(ctrsKey)
-						.set("user_stats_logins", 0L)
-						.set("user_stats_failed", 0L)
-						.set("user_first_login", Timestamp.now())
-						.set("user_last_login", Timestamp.now())
-						.build();
-			}
+			if (user != null) {
+				LOG.info("User entity found for: " + data.username);
+				String hashedPWD_from_DB = user.getString(USER_PWD_PROPERTY);
+				String hashedPWD_from_Input = DigestUtils.sha512Hex(data.password);
 
-			String hashedPWD = (String) user.getString(USER_PWD);
-			if (hashedPWD.equals(DigestUtils.sha512Hex(data.password))) {
-				// Login successful
-				// Construct the logs
-				String cityLatLong = headers.getHeaderString("X-AppEngine-CityLatLong");
-				Entity log = Entity.newBuilder(logKey)
-						.set("user_login_ip", request.getRemoteAddr())
-						.set("user_login_host", request.getRemoteHost())
-						.set("user_login_latlon", cityLatLong != null
-								? StringValue.newBuilder(cityLatLong).setExcludeFromIndexes(true).build()
-								: StringValue.newBuilder("").setExcludeFromIndexes(true).build())
-						.set("user_login_city", headers.getHeaderString("X-AppEngine-City"))
-						.set("user_login_country", headers.getHeaderString("X-AppEngine-Country"))
-						.set("user_login_time", Timestamp.now())
-						.build();
+				LOG.info("DB Hash for " + data.username + ": " + hashedPWD_from_DB);
+				LOG.info("Input Hash for " + data.username + ": " + hashedPWD_from_Input);
 
-				// Get the user statistics and updates it
-				// Copying information every time a user logins may not be a good solution
-				// (why?)
-				Entity ustats = Entity.newBuilder(ctrsKey)
-						.set("user_stats_logins", stats.getLong("user_stats_logins") + 1)
-						.set("user_stats_failed", 0L)
-						.set("user_first_login", stats.getTimestamp("user_first_login"))
-						.set("user_last_login", Timestamp.now())
-						.build();
+				if (hashedPWD_from_DB != null && hashedPWD_from_DB.equals(hashedPWD_from_Input)) {
+					LOG.info("Password match successful for user: " + data.username);
 
-				// Batch operation
-				txn.put(log, ustats);
-				txn.commit();
+					String userState = user.contains(USER_STATE_PROPERTY) ? user.getString(USER_STATE_PROPERTY) : "DESATIVADA";
+					LOG.info("Account state for " + data.username + ": " + userState);
 
-				// Return token
-				AuthToken token = new AuthToken(data.username);
-				LOG.info(LOG_MESSAGE_LOGIN_SUCCESSFUL + data.username);
-				return Response.ok(g.toJson(token)).build();
+					if (!"ATIVADA".equalsIgnoreCase(userState)) {
+						LOG.warning(LOG_MESSAGE_INACTIVE_ACCOUNT + data.username + " (State: " + userState + ")");
+						return Response.status(Status.FORBIDDEN).entity(MESSAGE_INVALID_CREDENTIALS).build();
+					}
+
+					String userRole = user.contains(USER_ROLE_PROPERTY) ? user.getString(USER_ROLE_PROPERTY) : "enduser";
+					LOG.info("Account role for " + data.username + ": " + userRole);
+
+					// --- Atualizar login time (Opcional) ---
+					try {
+						Entity updatedUser = Entity.newBuilder(user)
+								.set(USER_LOGIN_TIME_PROPERTY, Timestamp.now())
+								.build();
+						datastore.update(updatedUser);
+					} catch (DatastoreException e) {
+						LOG.log(Level.WARNING, "Non-critical error: Failed to update login time for user " + data.username, e);
+					}
+
+					// --- CRIAR TOKEN ---
+					AuthToken token = new AuthToken(data.username, userRole);
+					LOG.info("AuthToken created for user: " + data.username + " with TokenID: " + token.tokenID);
+
+					// --- GUARDAR TOKEN NO DATASTORE ---
+					try {
+						Key tokenKey = tokenKeyFactory.newKey(token.tokenID); // Usa o tokenID como Key
+						Entity tokenEntity = Entity.newBuilder(tokenKey)
+								.set("username", token.username)
+								.set("role", token.role)
+								.set("creationData", token.creationData)     // Guarda como Long
+								.set("expirationData", token.expirationData) // Guarda como Long
+								// Opcional: adicionar um Timestamp de criação/expiração também
+								.set("creationTimestamp", Timestamp.of(new java.util.Date(token.creationData)))
+								.set("expirationTimestamp", Timestamp.of(new java.util.Date(token.expirationData)))
+								.build();
+						datastore.put(tokenEntity); // Guarda a entidade do token
+						LOG.info("Token persisted to Datastore for TokenID: " + token.tokenID);
+					} catch (DatastoreException e) {
+						LOG.log(Level.SEVERE, "Failed to persist token to Datastore for user: " + data.username, e);
+						// Continuamos mesmo se falhar guardar o token por agora
+					}
+					// --- FIM GUARDAR TOKEN ---
+
+					LOG.info(LOG_MESSAGE_LOGIN_SUCCESSFUL + data.username + " (Role: " + userRole + ")");
+					return Response.ok(g.toJson(token)).build(); // Retorna o token ao cliente
+
+				} else {
+					LOG.warning(LOG_MESSAGE_WRONG_PASSWORD + data.username);
+					return Response.status(Status.FORBIDDEN).entity(MESSAGE_INVALID_CREDENTIALS).build();
+				}
 			} else {
-				// Incorrect password
-				// Copying here is even worse. Propose a better solution!
-				Entity ustats = Entity.newBuilder(ctrsKey)
-						.set("user_stats_logins", stats.getLong("user_stats_logins"))
-						.set("user_stats_failed", stats.getLong("user_stats_failed") + 1L)
-						.set("user_first_login", stats.getTimestamp("user_first_login"))
-						.set("user_last_login", stats.getTimestamp("user_last_login"))
-						.set("user_last_attempt", Timestamp.now())
-						.build();
-
-				txn.put(ustats);
-				txn.commit();
-				LOG.warning(LOG_MESSAGE_WRONG_PASSWORD + data.username);
+				LOG.warning(LOG_MESSAGE_USER_NOT_FOUND + data.username);
 				return Response.status(Status.FORBIDDEN).entity(MESSAGE_INVALID_CREDENTIALS).build();
 			}
+		} catch (DatastoreException e) {
+			LOG.log(Level.SEVERE, "Datastore error during login for user: " + data.username, e);
+			return Response.status(Status.INTERNAL_SERVER_ERROR).entity("Datastore error during login.").build();
 		} catch (Exception e) {
-			txn.rollback();
-			LOG.severe(e.getMessage());
-			return Response.status(Status.INTERNAL_SERVER_ERROR).build();
-		} finally {
-			if (txn.isActive()) {
-				txn.rollback();
-			}
+			LOG.log(Level.SEVERE, "Unexpected error during login for user: " + data.username, e);
+			return Response.status(Status.INTERNAL_SERVER_ERROR).entity("Unexpected error during login.").build();
 		}
 	}
 
-	@POST
-	@Path("/user")
+	@POST // Ou @DELETE se preferires essa semântica
+	@Path("/logout")
+	// Não consome nada específico, mas pode receber um corpo vazio
 	@Consumes(MediaType.APPLICATION_JSON)
-	@Produces(MediaType.APPLICATION_JSON)
-	public Response getLatestLogins(LoginData data) {
+	public Response doLogout(@HeaderParam("Authorization") String authorizationHeader) {
 
-		Key userKey = userKeyFactory.newKey(data.username);
+		LOG.fine("Logout attempt received.");
 
-		Entity user = datastore.get(userKey);
-		if (user != null && user.getString(USER_PWD).equals(DigestUtils.sha512Hex(data.password))) {
-
-			// Get the date of yesterday
-			Calendar cal = Calendar.getInstance();
-			cal.add(Calendar.DATE, -1);
-			Timestamp yesterday = Timestamp.of(cal.getTime());
-
-			Query<Entity> query = Query.newEntityQueryBuilder()
-					.setKind("UserLog")
-					.setFilter(
-							CompositeFilter.and(
-									PropertyFilter.hasAncestor(
-											datastore.newKeyFactory().setKind("User").newKey(data.username)),
-									PropertyFilter.ge(USER_LOGIN_TIME, yesterday)))
-					.setOrderBy(OrderBy.desc(USER_LOGIN_TIME))
-					.setLimit(3)
-					.build();
-			QueryResults<Entity> logs = datastore.run(query);
-
-			List<Date> loginDates = new ArrayList<Date>();
-			logs.forEachRemaining(userlog -> {
-				loginDates.add(userlog.getTimestamp(USER_LOGIN_TIME).toDate());
-			});
-
-			return Response.ok(g.toJson(loginDates)).build();
+		// 1. Extrair Token ID do Header
+		if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+			LOG.warning("Logout failed: Missing or invalid Authorization header format.");
+			// Retorna 400 Bad Request se o formato do header estiver errado
+			return Response.status(Status.BAD_REQUEST).entity("Invalid Authorization header.").build();
 		}
-		return Response.status(Status.FORBIDDEN).entity(MESSAGE_INVALID_CREDENTIALS)
-				.build();
-	}
+		String tokenId = authorizationHeader.substring(7).trim();
+		if (tokenId.isEmpty()) {
+			LOG.warning("Logout failed: Token ID is empty.");
+			return Response.status(Status.BAD_REQUEST).entity("Empty token ID.").build();
+		}
 
-	@POST
-	@Path("/user/pagination")
-	@Consumes(MediaType.APPLICATION_JSON)
-	@Produces(MediaType.APPLICATION_JSON)
-	public Response getLatestLogins(@QueryParam("next") String nextParam, LoginData data) {
+		LOG.info("Logout attempt for TokenID: " + tokenId);
 
-		int next;
-
-		// Checking for valid request parameter values
+		// 2. Tentar Apagar a Entidade do Token no Datastore
 		try {
-			next = Integer.parseInt(nextParam);
-			if (next < 0)
-				return Response.status(Status.BAD_REQUEST).entity(MESSAGE_NEXT_PARAMETER_INVALID).build();
-		} catch (NumberFormatException e) {
-			return Response.status(Status.BAD_REQUEST).entity(MESSAGE_NEXT_PARAMETER_INVALID).build();
+			Key tokenKey = tokenKeyFactory.newKey(tokenId); // Usa o tokenKeyFactory
+
+			// Verificar se o token existe antes de apagar (opcional, delete não falha se não existir)
+			// Entity tokenEntity = datastore.get(tokenKey);
+			// if (tokenEntity == null) {
+			//    LOG.warning("Logout failed: TokenID not found in Datastore: " + tokenId);
+			//    // Retorna sucesso mesmo assim? Ou um erro específico? Sucesso é razoável.
+			//    return Response.ok().entity("Logout successful (token already invalid or expired).").build();
+			// }
+
+			// Apaga a entidade do token. Se não existir, não acontece nada.
+			datastore.delete(tokenKey);
+
+			LOG.info("Logout successful: Token removed from Datastore for TokenID: " + tokenId);
+			// Usar 200 OK com mensagem ou 204 No Content
+			return Response.ok().entity("Logout successful.").build();
+			// return Response.noContent().build();
+
+		} catch (DatastoreException e) {
+			LOG.log(Level.SEVERE, "Logout Datastore error for TokenID: " + tokenId, e);
+			// Mesmo em caso de erro no Datastore, o cliente deve considerar-se deslogado
+			// Pode ser melhor retornar sucesso para o cliente, mas logar o erro severo.
+			// Ou retornar erro 500. Vamos retornar 500 para indicar problema.
+			return Response.status(Status.INTERNAL_SERVER_ERROR).entity("Error during logout (Datastore).").build();
+		} catch (Exception e) {
+			LOG.log(Level.SEVERE, "Logout Unexpected error for TokenID: " + tokenId, e);
+			return Response.status(Status.INTERNAL_SERVER_ERROR).entity("Error during logout (Unexpected).").build();
 		}
-
-		Key userKey = userKeyFactory.newKey(data.username);
-
-		Entity user = datastore.get(userKey);
-		if (user != null && user.getString(USER_PWD).equals(DigestUtils.sha512Hex(data.password))) {
-
-			// Get the date of yesterday
-			Calendar cal = Calendar.getInstance();
-			cal.add(Calendar.DATE, -1);
-			Timestamp yesterday = Timestamp.of(cal.getTime());
-
-			Query<Entity> query = Query.newEntityQueryBuilder()
-					.setKind("UserLog")
-					.setFilter(
-							CompositeFilter.and(
-									PropertyFilter.hasAncestor(
-											datastore.newKeyFactory().setKind("User").newKey(data.username)),
-									PropertyFilter.ge(USER_LOGIN_TIME, yesterday)))
-					.setOrderBy(OrderBy.desc(USER_LOGIN_TIME))
-					.setLimit(3)
-					.setOffset(next)
-					.build();
-			QueryResults<Entity> logs = datastore.run(query);
-
-			List<Date> loginDates = new ArrayList<Date>();
-			logs.forEachRemaining(userlog -> {
-				loginDates.add(userlog.getTimestamp(USER_LOGIN_TIME).toDate());
-			});
-
-			return Response.ok(g.toJson(loginDates)).build();
-		}
-		return Response.status(Status.FORBIDDEN).entity(MESSAGE_INVALID_CREDENTIALS)
-				.build();
 	}
-
 }
