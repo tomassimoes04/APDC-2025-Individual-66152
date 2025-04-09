@@ -98,10 +98,4 @@ O utilizador root com role ADMIN e password password123 (verificar AppInitListen
 
 A validação de tokens é feita verificando a existência e expiração do token no Datastore.
 
-A pasta INFO/ (se existir) pode conter notas adicionais.
 
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-IGNORE_WHEN_COPYING_END
