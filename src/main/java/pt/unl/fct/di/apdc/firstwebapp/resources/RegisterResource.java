@@ -20,20 +20,17 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
-import jakarta.ws.rs.DELETE;
-import jakarta.ws.rs.PathParam;
-// Removido import não utilizado: import pt.unl.fct.di.apdc.firstwebapp.util.LoginData;
+
 import pt.unl.fct.di.apdc.firstwebapp.util.RegisterData;
 
 @Path("/register")
 public class RegisterResource {
 
 	private static final Logger LOG = Logger.getLogger(RegisterResource.class.getName());
-	// Restaura a inicialização simples do Datastore para rodar na cloud
+
 	private static final Datastore datastore = DatastoreOptions.getDefaultInstance().getService();
 
-	// Removida instância Gson não utilizada aqui
-	// private final Gson g = new Gson();
+
 
 
 	public RegisterResource() {}	// Default constructor, nothing to do
@@ -44,15 +41,14 @@ public class RegisterResource {
 	@Consumes(MediaType.APPLICATION_JSON)
 	public Response registerUser(RegisterData data) {
 
-		// --- INÍCIO DA VALIDAÇÃO DIRETA PARA DEBUG ---
-		// Log inicial para ver o que foi recebido (pode precisar do Gson de volta se quiser formatar)
+
 		LOG.info("Received registration attempt for user: " + (data != null ? data.username : "null data object"));
 
 		if (data == null) {
 			LOG.warning("Validation failed: Received null data object.");
 			return Response.status(Status.BAD_REQUEST).entity("Invalid registration data: No data provided.").build();
 		}
-		// Função auxiliar para verificar campos (pode estar em RegisterData ou aqui)
+
 		java.util.function.Predicate<String> isInvalid = field -> (field == null || field.isBlank());
 
 		if (isInvalid.test(data.username)) {
@@ -88,9 +84,9 @@ public class RegisterResource {
 			return Response.status(Status.BAD_REQUEST).entity("Passwords do not match.").build();
 		}
 
-		// Validação de complexidade da password (copiada/adaptada de RegisterData)
+
 		boolean passwordMeetsCriteria;
-		{ // Bloco para limitar escopo das variáveis de complexidade
+		{
 			String password = data.password;
 			if (password.length() < 8) {
 				passwordMeetsCriteria = false;
@@ -107,23 +103,14 @@ public class RegisterResource {
 					LOG.warning("Password complexity failed: Criteria count < 3. User: " + data.username);
 				}
 			}
-		} // Fim do bloco de complexidade
+		}
 
 		if (!passwordMeetsCriteria) {
 			return Response.status(Status.BAD_REQUEST).entity("Password does not meet complexity requirements.").build();
 		}
 
 		LOG.info("Direct validation passed for user: " + data.username);
-		// --- FIM DA VALIDAÇÃO DIRETA PARA DEBUG ---
 
-
-		// Comentada a chamada original à validação, já que a fizemos manualmente acima
-		/*
-		if (!data.validRegistration()) {
-			LOG.warning("Registration validation failed for user: " + data.username);
-			return Response.status(Status.BAD_REQUEST).entity("Invalid registration data. Check parameters and password complexity.").build();
-		}
-		*/
 
 		Transaction txn = datastore.newTransaction();
 		try {

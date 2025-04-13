@@ -26,19 +26,15 @@ import pt.unl.fct.di.apdc.firstwebapp.util.LoginData;
 @Produces(MediaType.APPLICATION_JSON + ";charset=utf-8")
 public class LoginResource {
 
-	// Mensagem genérica para falhas de login (segurança)
 	private static final String MESSAGE_INVALID_CREDENTIALS = "Incorrect username or password.";
 
-	// Constantes para Logging
 	private static final String LOG_MESSAGE_LOGIN_ATTEMPT = "Login attempt by user: ";
 	private static final String LOG_MESSAGE_LOGIN_SUCCESSFUL = "Login successful for user: ";
 	private static final String LOG_MESSAGE_WRONG_PASSWORD = "Wrong password provided for user: ";
 	private static final String LOG_MESSAGE_USER_NOT_FOUND = "Login failed: User not found: ";
 	private static final String LOG_MESSAGE_INACTIVE_ACCOUNT = "Login failed: Account inactive or invalid state for user: ";
 
-	// Constante para o nome do campo da password no Datastore
 	private static final String USER_PWD_PROPERTY = "user_pwd";
-	// Constantes para os novos campos a verificar/ler
 	private static final String USER_STATE_PROPERTY = "user_state";
 	private static final String USER_ROLE_PROPERTY = "user_role";
 	private static final String USER_LOGIN_TIME_PROPERTY = "user_login_time";
@@ -46,13 +42,11 @@ public class LoginResource {
 	private static final Logger LOG = Logger.getLogger(LoginResource.class.getName());
 	private static final Datastore datastore = DatastoreOptions.getDefaultInstance().getService();
 	private static final KeyFactory userKeyFactory = datastore.newKeyFactory().setKind("User");
-	// --- ADICIONADO KeyFactory para Tokens ---
 	private static final KeyFactory tokenKeyFactory = datastore.newKeyFactory().setKind("AuthToken");
 
-	private final Gson g = new Gson(); // Gson é necessário para serializar o AuthToken
+	private final Gson g = new Gson();
 
 	public LoginResource() {
-		// Construtor vazio
 	}
 
 	@POST
@@ -60,7 +54,6 @@ public class LoginResource {
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response doLogin(LoginData data) {
-		// Validação básica do input
 		if (data == null || data.username == null || data.password == null || data.username.isBlank() || data.password.isBlank()) {
 			LOG.warning("Login failed: Missing username or password in request body.");
 			return Response.status(Status.BAD_REQUEST).entity("Missing username or password.").build();
@@ -94,7 +87,6 @@ public class LoginResource {
 					String userRole = user.contains(USER_ROLE_PROPERTY) ? user.getString(USER_ROLE_PROPERTY) : "enduser";
 					LOG.info("Account role for " + data.username + ": " + userRole);
 
-					// --- Atualizar login time (Opcional) ---
 					try {
 						Entity updatedUser = Entity.newBuilder(user)
 								.set(USER_LOGIN_TIME_PROPERTY, Timestamp.now())
@@ -104,32 +96,27 @@ public class LoginResource {
 						LOG.log(Level.WARNING, "Non-critical error: Failed to update login time for user " + data.username, e);
 					}
 
-					// --- CRIAR TOKEN ---
 					AuthToken token = new AuthToken(data.username, userRole);
 					LOG.info("AuthToken created for user: " + data.username + " with TokenID: " + token.tokenID);
 
-					// --- GUARDAR TOKEN NO DATASTORE ---
 					try {
-						Key tokenKey = tokenKeyFactory.newKey(token.tokenID); // Usa o tokenID como Key
+						Key tokenKey = tokenKeyFactory.newKey(token.tokenID);
 						Entity tokenEntity = Entity.newBuilder(tokenKey)
 								.set("username", token.username)
 								.set("role", token.role)
-								.set("creationData", token.creationData)     // Guarda como Long
-								.set("expirationData", token.expirationData) // Guarda como Long
-								// Opcional: adicionar um Timestamp de criação/expiração também
+								.set("creationData", token.creationData)
+								.set("expirationData", token.expirationData)
 								.set("creationTimestamp", Timestamp.of(new java.util.Date(token.creationData)))
 								.set("expirationTimestamp", Timestamp.of(new java.util.Date(token.expirationData)))
 								.build();
-						datastore.put(tokenEntity); // Guarda a entidade do token
+						datastore.put(tokenEntity);
 						LOG.info("Token persisted to Datastore for TokenID: " + token.tokenID);
 					} catch (DatastoreException e) {
 						LOG.log(Level.SEVERE, "Failed to persist token to Datastore for user: " + data.username, e);
-						// Continuamos mesmo se falhar guardar o token por agora
 					}
-					// --- FIM GUARDAR TOKEN ---
 
 					LOG.info(LOG_MESSAGE_LOGIN_SUCCESSFUL + data.username + " (Role: " + userRole + ")");
-					return Response.ok(g.toJson(token)).build(); // Retorna o token ao cliente
+					return Response.ok(g.toJson(token)).build();
 
 				} else {
 					LOG.warning(LOG_MESSAGE_WRONG_PASSWORD + data.username);
@@ -148,18 +135,15 @@ public class LoginResource {
 		}
 	}
 
-	@POST // Ou @DELETE se preferires essa semântica
+	@POST
 	@Path("/logout")
-	// Não consome nada específico, mas pode receber um corpo vazio
 	@Consumes(MediaType.APPLICATION_JSON)
 	public Response doLogout(@HeaderParam("Authorization") String authorizationHeader) {
 
 		LOG.fine("Logout attempt received.");
 
-		// 1. Extrair Token ID do Header
 		if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
 			LOG.warning("Logout failed: Missing or invalid Authorization header format.");
-			// Retorna 400 Bad Request se o formato do header estiver errado
 			return Response.status(Status.BAD_REQUEST).entity("Invalid Authorization header.").build();
 		}
 		String tokenId = authorizationHeader.substring(7).trim();
@@ -170,31 +154,16 @@ public class LoginResource {
 
 		LOG.info("Logout attempt for TokenID: " + tokenId);
 
-		// 2. Tentar Apagar a Entidade do Token no Datastore
 		try {
-			Key tokenKey = tokenKeyFactory.newKey(tokenId); // Usa o tokenKeyFactory
+			Key tokenKey = tokenKeyFactory.newKey(tokenId);
 
-			// Verificar se o token existe antes de apagar (opcional, delete não falha se não existir)
-			// Entity tokenEntity = datastore.get(tokenKey);
-			// if (tokenEntity == null) {
-			//    LOG.warning("Logout failed: TokenID not found in Datastore: " + tokenId);
-			//    // Retorna sucesso mesmo assim? Ou um erro específico? Sucesso é razoável.
-			//    return Response.ok().entity("Logout successful (token already invalid or expired).").build();
-			// }
-
-			// Apaga a entidade do token. Se não existir, não acontece nada.
 			datastore.delete(tokenKey);
 
 			LOG.info("Logout successful: Token removed from Datastore for TokenID: " + tokenId);
-			// Usar 200 OK com mensagem ou 204 No Content
 			return Response.ok().entity("Logout successful.").build();
-			// return Response.noContent().build();
 
 		} catch (DatastoreException e) {
 			LOG.log(Level.SEVERE, "Logout Datastore error for TokenID: " + tokenId, e);
-			// Mesmo em caso de erro no Datastore, o cliente deve considerar-se deslogado
-			// Pode ser melhor retornar sucesso para o cliente, mas logar o erro severo.
-			// Ou retornar erro 500. Vamos retornar 500 para indicar problema.
 			return Response.status(Status.INTERNAL_SERVER_ERROR).entity("Error during logout (Datastore).").build();
 		} catch (Exception e) {
 			LOG.log(Level.SEVERE, "Logout Unexpected error for TokenID: " + tokenId, e);

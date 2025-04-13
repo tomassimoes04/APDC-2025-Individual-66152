@@ -13,11 +13,11 @@ public class AuthToken {
 	public long creationData;
 	public long expirationData;
 
-	// Construtor vazio (útil para frameworks como JAX-RS/Jackson)
+
 	public AuthToken() {
 	}
 
-	// Construtor principal para criar um novo token
+
 	public AuthToken(String username, String role) { // Parâmetro 'role' adicionado
 		this.username = username;
 		this.role = role; // 'role' atribuído
@@ -27,9 +27,5 @@ public class AuthToken {
 		this.expirationData = this.creationData + EXPIRATION_TIME;
 	}
 
-	// Poderias adicionar um método 'isValid()' aqui se quisesses verificar a expiração,
-	// mas a verificação será feita no lado do servidor ao receber o token.
-	// public boolean isValid() {
-	//     return System.currentTimeMillis() < expirationData;
-	// }
+
 }

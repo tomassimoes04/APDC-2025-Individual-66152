@@ -1,6 +1,6 @@
 package pt.unl.fct.di.apdc.firstwebapp.util;
 
-import java.util.Set; // Usado para validar roles
+import java.util.Set;
 
 public class ChangeRoleData {
     public String targetUser; // Username do utilizador a modificar
@@ -18,10 +18,9 @@ public class ChangeRoleData {
 
     // Validação simples
     public boolean isValid() {
-        // Verifica se targetUser não é nulo/vazio
-        // Verifica se newRole não é nulo/vazio e se pertence ao conjunto de roles válidos
+
         return targetUser != null && !targetUser.isBlank() &&
                 newRole != null && !newRole.isBlank() &&
-                VALID_ROLES.contains(newRole.toUpperCase()); // Compara com roles válidos em maiúsculas
+                VALID_ROLES.contains(newRole.toUpperCase());
     }
 }

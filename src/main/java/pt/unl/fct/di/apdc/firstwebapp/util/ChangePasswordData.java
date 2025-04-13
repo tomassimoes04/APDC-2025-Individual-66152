@@ -1,12 +1,11 @@
-// Nova classe: ChangePasswordData.java (no pacote .util)
+
 package pt.unl.fct.di.apdc.firstwebapp.util;
 
-// Importar Logger se quiseres adicionar logs na validação de complexidade
-// import java.util.logging.Logger;
+
 
 public class ChangePasswordData {
 
-    // private static final Logger LOG = Logger.getLogger(ChangePasswordData.class.getName()); // Opcional
+
 
     public String currentPassword;
     public String newPassword;
@@ -20,25 +19,19 @@ public class ChangePasswordData {
         this.confirmation = confirmation;
     }
 
-    /**
-     * Verifica se os dados são minimamente válidos (campos presentes e confirmação OK).
-     * Não verifica a currentPassword aqui (isso é feito no recurso).
-     * Verifica a complexidade da nova password.
-     */
+
     public boolean isValid() {
         if (currentPassword == null || currentPassword.isBlank() ||
                 newPassword == null || newPassword.isBlank() ||
                 confirmation == null || confirmation.isBlank()) {
-            // LOG.warning("ChangePassword validation failed: Missing fields."); // Opcional
-            return false; // Garante que todos os campos estão presentes
+
+            return false;
         }
         if (!newPassword.equals(confirmation)) {
-            // LOG.warning("ChangePassword validation failed: New password and confirmation do not match."); // Opcional
-            return false; // Nova password e confirmação devem ser iguais
+            return false;
         }
         if (!checkNewPasswordComplexity(newPassword)) {
-            // LOG.warning("ChangePassword validation failed: New password does not meet complexity criteria."); // Opcional
-            return false; // Nova password deve ser complexa
+            return false;
         }
         return true;
     }
@@ -49,7 +42,7 @@ public class ChangePasswordData {
      */
     private boolean checkNewPasswordComplexity(String password) {
         if (password == null || password.length() < 8) {
-            // LOG.fine("New password complexity failed: Length < 8"); // Usar FINE para debug
+
             return false;
         }
         int criteriaMet = 0;
@@ -58,9 +51,9 @@ public class ChangePasswordData {
         if (password.matches(".*\\d.*")) criteriaMet++;    // Dígito
         if (password.matches(".*[!@#$%^&*(),.?\":{}|<>].*")) criteriaMet++; // Especial
 
-        boolean passed = criteriaMet >= 3; // Exige pelo menos 3 dos 4 critérios
+        boolean passed = criteriaMet >= 3;
         if (!passed) {
-            // LOG.fine("New password complexity failed: Criteria count < 3"); // Usar FINE para debug
+
         }
         return passed;
     }

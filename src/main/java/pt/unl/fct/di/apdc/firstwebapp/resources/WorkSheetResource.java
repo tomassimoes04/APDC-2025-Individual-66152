@@ -156,17 +156,17 @@ public class WorkSheetResource {
                 return Response.status(Status.NOT_FOUND).entity("Worksheet not found.").build();
             }
 
-            // --- VERIFICAÇÃO EXPLÍCITA DO ESTADO DE ADJUDICAÇÃO ---
+
             String adjudicationState = workSheet.contains(WS_ADJUDICATION_STATE) ? workSheet.getString(WS_ADJUDICATION_STATE) : "NÃO ADJUDICADO"; // Default seguro
             if (!adjudicationState.equals("ADJUDICADO")) {
                 txn.rollback();
                 LOG.warning("updateWorkState failed: Worksheet " + data.referencia + " is not adjudicated (State: "+adjudicationState+"). Requested by: " + token.username);
-                // Retorna 400 BAD REQUEST especificamente para este caso
+
                 return Response.status(Status.BAD_REQUEST).entity("Worksheet is not adjudicated.").build();
             }
-            // --- FIM DA VERIFICAÇÃO EXPLÍCITA ---
 
-            // Se chegou aqui, a obra ESTÁ ADJUDICADA. Agora verifica o parceiro.
+
+
             String assignedPartner = workSheet.contains(WS_PARTNER_ACCOUNT) ? workSheet.getString(WS_PARTNER_ACCOUNT) : null;
 
             if (assignedPartner == null || !assignedPartner.equals(token.username)) {
@@ -176,7 +176,7 @@ public class WorkSheetResource {
                 return Response.status(Status.FORBIDDEN).entity("User is not the assigned partner for this worksheet.").build();
             }
 
-            // Se chegou aqui, tem permissão e a obra está adjudicada ao user correto.
+
             // Atualiza o estado da obra
             Entity updatedWorkSheet = Entity.newBuilder(workSheet)
                     .set(WS_WORK_STATE, newWorkStateUpper)
@@ -204,7 +204,7 @@ public class WorkSheetResource {
     }
 
 
-    // --- MÉTODO validateToken (Copiado de UserResource) ---
+
     private AuthToken validateToken(String authorizationHeader) {
         // ... (Implementação EXATAMENTE igual à da UserResource) ...
         if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) { return null; }
@@ -228,4 +228,4 @@ public class WorkSheetResource {
         } catch (Exception e) { LOG.log(Level.SEVERE, "Token validation error (Worksheet): " + tokenId, e); return null; }
     }
 
-} // --- Fim da classe WorkSheetResource ---
+}

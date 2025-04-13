@@ -7,35 +7,26 @@ public class WorkSheetData {
 
     private static final Logger LOG = Logger.getLogger(WorkSheetData.class.getName());
 
-    // Atributos Obrigatórios Base
-    public String referencia;          // Ex: "0234/CM/2024"
+    public String referencia;
     public String descricao;
-    public String tipoAlvo;            // "PROPRIEDADE PÚBLICA" ou "PROPRIEDADE PRIVADA"
-    public String estadoAdjudicacao;   // "ADJUDICADO" ou "NÃO ADJUDICADO"
+    public String tipoAlvo;
+    public String estadoAdjudicacao;
 
-    // Atributos Opcionais / Condicionais (se ADJUDICADO)
-    public Long dataAdjudicacao;      // Data como timestamp Unix em milissegundos
-    public Long dataInicioPrevista;   // Data como timestamp Unix em milissegundos
-    public Long dataFimPrevista;      // Data como timestamp Unix em milissegundos
-    public String contaEntidade;       // Username do PARTNER
+    public Long dataAdjudicacao;
+    public Long dataInicioPrevista;
+    public Long dataFimPrevista;
+    public String contaEntidade;
     public String nomeEmpresa;
     public String nifEmpresa;
-    // estadoObra não é definido aqui, é atualizado depois pelo PARTNER
-    public String observacoes;         // Observações gerais
+    public String observacoes;
 
-    // Conjuntos para validação (copiados das constantes do Resource)
     private static final Set<String> VALID_ADJUDICATION_STATES = Set.of("ADJUDICADO", "NÃO ADJUDICADO");
     private static final Set<String> VALID_TARGET_TYPES = Set.of("PROPRIEDADE PÚBLICA", "PROPRIEDADE PRIVADA");
 
 
     public WorkSheetData() {}
 
-    /**
-     * Valida os dados da folha de obra.
-     * @return true se os dados são válidos, false caso contrário.
-     */
     public boolean isValid() {
-        // 1. Validar campos obrigatórios base
         if (referencia == null || referencia.isBlank() ||
                 descricao == null || descricao.isBlank() ||
                 tipoAlvo == null || tipoAlvo.isBlank() ||
@@ -44,7 +35,6 @@ public class WorkSheetData {
             return false;
         }
 
-        // 2. Validar valores de tipoAlvo e estadoAdjudicacao
         String tipoAlvoUpper = tipoAlvo.toUpperCase();
         String estadoAdjUpper = estadoAdjudicacao.toUpperCase();
 
@@ -57,7 +47,6 @@ public class WorkSheetData {
             return false;
         }
 
-        // 3. Validar campos condicionais se ADJUDICADO
         if (estadoAdjUpper.equals("ADJUDICADO")) {
             if (dataAdjudicacao == null || dataInicioPrevista == null || dataFimPrevista == null ||
                     contaEntidade == null || contaEntidade.isBlank() ||
@@ -67,10 +56,8 @@ public class WorkSheetData {
                 LOG.warning("WorkSheet validation failed: Missing adjudication details for ADJUDICADO state.");
                 return false;
             }
-            // Poderia adicionar validação de datas (inicio < fim), formato NIF, etc.
         }
 
-        // Se chegou aqui, é válido
         return true;
     }
 }

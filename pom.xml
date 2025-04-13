@@ -81,14 +81,7 @@
 			<artifactId>google-cloud-tasks</artifactId>
 		</dependency>
 
-		<!-- REMOVIDO: Dependência explícita google-auth-library-oauth2-http -->
-		<!--
-		<dependency>
-			<groupId>com.google.auth</groupId>
-			<artifactId>google-auth-library-oauth2-http</artifactId>
-			<version>1.23.0</version>
-		</dependency>
-		-->
+
 
 		<!-- Utilities -->
 		<dependency>
@@ -135,24 +128,14 @@
 				<artifactId>appengine-maven-plugin</artifactId>
 				<version>${appengine.maven.plugin.version}</version>
 				<configuration>
-					<!-- ***** DEFINE O TEU PROJECT ID AQUI ***** -->
+
 					<deploy.projectId>adcfinal</deploy.projectId>
-					<!-- Define uma versão ou deixa o plugin gerar (opcional) -->
+
 					<deploy.version>v1</deploy.version>
 				</configuration>
 			</plugin>
 
-			<!-- REMOVIDO: Plugin Jetty -->
-			<!--
-			<plugin>
-				<groupId>org.eclipse.jetty</groupId>
-				<artifactId>jetty-maven-plugin</artifactId>
-				<version>${jetty.plugin.version}</version>
-				<configuration>
-					...
-				</configuration>
-			</plugin>
-			-->
+
 
 		</plugins>
 
